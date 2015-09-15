@@ -18,6 +18,6 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="etcetera\bin\Release\etcetera.dll" target="bin" />
+    <file src="etcetera\bin\Release\etcetera.dll" target="lib" />
   </files>
 </package>
