@@ -1,4 +1,6 @@
-﻿namespace etcetera
+﻿using System.Net;
+
+namespace etcetera
 {
     using System;
     using System.Linq;
@@ -11,15 +13,22 @@
         readonly IRestClient _client;
         readonly Uri _keysRoot;
 
+        public string Username;
+        public string Password;
+
         public EtcdClient(Uri etcdLocation)
         {
             var uriBuilder = new UriBuilder(etcdLocation)
             {
-                Path = ""
+                Path = string.Empty
             };
+
+            Username = uriBuilder.UserName;
+            Password = uriBuilder.Password;
+
             var root = uriBuilder.Uri;
             _keysRoot = root.AppendPath("v2").AppendPath("keys");
-            _client = new RestClient(root.ToString());
+            _client = new RestClient(etcdLocation.ToString());
 
             Statistics = new StatisticsModule(root, _client);
             Machine = new MachineModule(root);
@@ -186,13 +195,19 @@
                 getRequest.AddParameter("waitIndex", waitIndex);
             }
 
-            _client.ExecuteAsync<EtcdResponse>(getRequest, r => followUp(processRestResponse(r)));
+            _client.ExecuteAsync<EtcdResponse>(getRequest, r => followUp(ProcessRestResponse(r)));
         }
 
         EtcdResponse makeKeyRequest(string key, Method method, Action<IRestRequest> action = null)
         {
             var requestUrl = _keysRoot.AppendPath(key);
             var request = new RestRequest(requestUrl, method);
+
+            if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password))
+            {
+                request.Credentials = new NetworkCredential(Username, Password);
+            }
+
 
             if (action != null) action(request);
 
@@ -202,15 +217,15 @@
 
             var response = _client.Execute<EtcdResponse>(request);
 
-            if(checkForError(response)) throw constructException(response);
-            
-            var etcdResponse = processRestResponse(response);
-            
+            if (CheckForError(response)) throw ConstructException(response);
+
+            var etcdResponse = ProcessRestResponse(response);
+
             return etcdResponse;
         }
 
 
-        static EtcdResponse processRestResponse(IRestResponse<EtcdResponse> response)
+        static EtcdResponse ProcessRestResponse(IRestResponse<EtcdResponse> response)
         {
             if (response == null) return null;
 
@@ -231,12 +246,12 @@
         }
 
 
-        static bool checkForError(IRestResponse<EtcdResponse> response)
+        static bool CheckForError(IRestResponse<EtcdResponse> response)
         {
             return response.StatusCode == 0;
         }
 
-        Exception constructException(IRestResponse<EtcdResponse> response)
+        Exception ConstructException(IRestResponse<EtcdResponse> response)
         {
             var msg = new StringBuilder();
             msg.AppendFormat("Server: '{0}'", _client.BaseUrl);
