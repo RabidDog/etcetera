@@ -20,6 +20,12 @@
         EtcdResponse Set(string key, string value, int ttl = 0, bool? prevExist = null, string prevValue = null,
             int? prevIndex = null);
 
+        /// <summary>
+        ///     Enables the ability to set a username and password on an HTTP request
+        /// </summary>
+        /// <param name="username">the username</param>
+        /// <param name="password">the password</param>
+        void SetBasicAuthentication(string username, string password);
 
         /// <summary>
         ///     Creates a dir
