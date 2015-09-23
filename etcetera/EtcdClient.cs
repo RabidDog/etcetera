@@ -13,26 +13,27 @@ namespace etcetera
         readonly IRestClient _client;
         readonly Uri _keysRoot;
 
-        public string Username;
-        public string Password;
 
         public EtcdClient(Uri etcdLocation)
         {
             var uriBuilder = new UriBuilder(etcdLocation)
             {
-                Path = string.Empty
+                Path = ""
             };
 
-            Username = uriBuilder.UserName;
-            Password = uriBuilder.Password;
 
             var root = uriBuilder.Uri;
             _keysRoot = root.AppendPath("v2").AppendPath("keys");
-            _client = new RestClient(root.ToString());
+            _client = new RestClient(etcdLocation.ToString());
 
             Statistics = new StatisticsModule(root, _client);
             Machine = new MachineModule(root);
             Members = new MembersModule(root, _client);
+        }
+
+        public void SetBasicAuthentication(string username, string password)
+        {
+            _client.Authenticator = new HttpBasicAuthenticator(username, password);
         }
 
         /// <summary>
@@ -50,7 +51,7 @@ namespace etcetera
         public EtcdResponse Set(string key, string value, int ttl = 0, bool? prevExist = null, string prevValue = null,
             int? prevIndex = null)
         {
-            return makeKeyRequest(key, Method.PUT, req =>
+            return MakeKeyRequest(key, Method.PUT, req =>
             {
                 req.AddParameter("value", value);
                 if (ttl > 0)
@@ -85,7 +86,7 @@ namespace etcetera
         /// <returns></returns>
         public EtcdResponse CreateDir(string key, int ttl = 0, bool prevExist = false)
         {
-            return makeKeyRequest(key, Method.PUT, req =>
+            return MakeKeyRequest(key, Method.PUT, req =>
             {
                 req.AddParameter("dir", "true");
                 if (ttl > 0)
@@ -109,7 +110,7 @@ namespace etcetera
         /// <returns></returns>
         public EtcdResponse Get(string key, bool recursive = false, bool sorted = false, bool consistent = false)
         {
-            return makeKeyRequest(key, Method.GET, req =>
+            return MakeKeyRequest(key, Method.GET, req =>
             {
                 req.AddParameter("recursive", recursive.ToString().ToLower());
                 req.AddParameter("sorted", sorted.ToString().ToLower());
@@ -125,7 +126,7 @@ namespace etcetera
         /// <returns>note the key will be 'key/index' in the return object</returns>
         public EtcdResponse Queue(string key, object value)
         {
-            return makeKeyRequest(key, Method.POST, req => { req.AddParameter("value", value); });
+            return MakeKeyRequest(key, Method.POST, req => { req.AddParameter("value", value); });
         }
 
 
@@ -138,7 +139,7 @@ namespace etcetera
         /// <returns></returns>
         public EtcdResponse Delete(string key, string prevValue = null, int? prevIndex = null)
         {
-            return makeKeyRequest(key, Method.DELETE, req =>
+            return MakeKeyRequest(key, Method.DELETE, req =>
             {
                 if (prevValue != null)
                 {
@@ -159,7 +160,7 @@ namespace etcetera
         /// <returns></returns>
         public EtcdResponse DeleteDir(string key, bool recursive = false)
         {
-            return makeKeyRequest(key, Method.DELETE, req =>
+            return MakeKeyRequest(key, Method.DELETE, req =>
             {
                 req.AddParameter("dir", "true");
                 if (recursive) req.AddParameter("recursive", "true");
@@ -198,16 +199,10 @@ namespace etcetera
             _client.ExecuteAsync<EtcdResponse>(getRequest, r => followUp(ProcessRestResponse(r)));
         }
 
-        EtcdResponse makeKeyRequest(string key, Method method, Action<IRestRequest> action = null)
+        EtcdResponse MakeKeyRequest(string key, Method method, Action<IRestRequest> action = null)
         {
             var requestUrl = _keysRoot.AppendPath(key);
             var request = new RestRequest(requestUrl, method);
-
-            if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password))
-            {
-                request.Credentials = new NetworkCredential(Username, Password);
-            }
-
 
             if (action != null) action(request);
 
@@ -217,10 +212,10 @@ namespace etcetera
 
             var response = _client.Execute<EtcdResponse>(request);
 
-            if (CheckForError(response)) throw ConstructException(response);
-
+            if(CheckForError(response)) throw ConstructException(response);
+            
             var etcdResponse = ProcessRestResponse(response);
-
+            
             return etcdResponse;
         }
 
