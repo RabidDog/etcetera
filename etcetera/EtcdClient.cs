@@ -26,7 +26,7 @@ namespace etcetera
 
             var root = uriBuilder.Uri;
             _keysRoot = root.AppendPath("v2").AppendPath("keys");
-            _client = new RestClient(etcdLocation.ToString());
+            _client = new RestClient(root.ToString());
 
             Statistics = new StatisticsModule(root, _client);
             Machine = new MachineModule(root);
