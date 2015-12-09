@@ -23,9 +23,12 @@ namespace etcetera
                 Path = ""
             };
 
+	        var path = etcdLocation.LocalPath.StartsWith("/")
+		        ? etcdLocation.LocalPath.Substring(1)
+		        : etcdLocation.LocalPath;
 
-            var root = uriBuilder.Uri;
-            _keysRoot = root.AppendPath(etcdLocation.LocalPath.Replace("/", string.Empty)).AppendPath("v2").AppendPath("keys");
+			var root = uriBuilder.Uri;
+            _keysRoot = root.AppendPath(path).AppendPath("v2").AppendPath("keys");
             _client = new RestClient(root.ToString());
 
             Statistics = new StatisticsModule(root, _client);
