@@ -23,19 +23,17 @@ namespace etcetera
                 Path = ""
             };
 
+	        var path = etcdLocation.LocalPath.StartsWith("/")
+		        ? etcdLocation.LocalPath.Substring(1)
+		        : etcdLocation.LocalPath;
 
-            var root = uriBuilder.Uri;
-            _keysRoot = root.AppendPath("v2").AppendPath("keys");
+			var root = uriBuilder.Uri;
+            _keysRoot = root.AppendPath(path).AppendPath("v2").AppendPath("keys");
             _client = new RestClient(root.ToString());
 
             Statistics = new StatisticsModule(root, _client);
             Machine = new MachineModule(root);
             Members = new MembersModule(root, _client);
-        }
-
-        public void SetBasicAuthentication(string username, string password)
-        {
-            _client.Authenticator = new HttpBasicAuthenticator(username, password);
         }
 
         /// <summary>
@@ -116,7 +114,7 @@ namespace etcetera
             {
                 req.AddParameter("recursive", recursive.ToString().ToLower());
                 req.AddParameter("sorted", sorted.ToString().ToLower());
-                req.AddParameter("consistent", sorted.ToString().ToLower());
+                req.AddParameter("consistent", consistent.ToString().ToLower());
             });
         }
 
@@ -279,6 +277,11 @@ namespace etcetera
             {
                 _client.ClientCertificates = value;
             }
+        }
+
+        public void SetBasicAuthentication(string username, string password)
+        {
+            _client.Authenticator = new HttpBasicAuthenticator(username, password);
         }
     }
 }

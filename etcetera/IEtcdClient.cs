@@ -21,13 +21,6 @@
             int? prevIndex = null);
 
         /// <summary>
-        ///     Enables the ability to set a username and password on an HTTP request
-        /// </summary>
-        /// <param name="username">the username</param>
-        /// <param name="password">the password</param>
-        void SetBasicAuthentication(string username, string password);
-
-        /// <summary>
         ///     Creates a dir
         /// </summary>
         /// <param name="key">the directory key</param>
@@ -90,5 +83,11 @@
         IEtcdMembersModule Members { get; }
 
         X509CertificateCollection ClientCertificates { get; set; }
+
+        /// <summary>
+        /// Allows you to set the underlying authentication mechanism to 
+        /// http basic auth.
+        /// </summary>
+        void SetBasicAuthentication(string username, string password);
     }
 }
