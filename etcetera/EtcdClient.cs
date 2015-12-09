@@ -18,7 +18,7 @@
                 Path = ""
             };
             var root = uriBuilder.Uri;
-            _keysRoot = root.AppendPath("v2").AppendPath("keys");
+            _keysRoot = root.AppendPath(etcdLocation.LocalPath.Replace("/", string.Empty)).AppendPath("v2").AppendPath("keys");
             _client = new RestClient(root.ToString());
 
             Statistics = new StatisticsModule(root, _client);
