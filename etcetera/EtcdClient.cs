@@ -1,4 +1,8 @@
-﻿namespace etcetera
+﻿using System.Net;
+using Polly;
+using RestSharp.Authenticators;
+
+namespace etcetera
 {
     using System;
     using System.Linq;
@@ -11,12 +15,15 @@
         readonly IRestClient _client;
         readonly Uri _keysRoot;
 
+
         public EtcdClient(Uri etcdLocation)
         {
             var uriBuilder = new UriBuilder(etcdLocation)
             {
                 Path = ""
             };
+
+
             var root = uriBuilder.Uri;
             _keysRoot = root.AppendPath(etcdLocation.LocalPath.Replace("/", string.Empty)).AppendPath("v2").AppendPath("keys");
             _client = new RestClient(root.ToString());
@@ -41,7 +48,7 @@
         public EtcdResponse Set(string key, string value, int ttl = 0, bool? prevExist = null, string prevValue = null,
             int? prevIndex = null)
         {
-            return makeKeyRequest(key, Method.PUT, req =>
+            return MakeKeyRequest(key, Method.PUT, req =>
             {
                 req.AddParameter("value", value);
                 if (ttl > 0)
@@ -76,7 +83,7 @@
         /// <returns></returns>
         public EtcdResponse CreateDir(string key, int ttl = 0, bool prevExist = false)
         {
-            return makeKeyRequest(key, Method.PUT, req =>
+            return MakeKeyRequest(key, Method.PUT, req =>
             {
                 req.AddParameter("dir", "true");
                 if (ttl > 0)
@@ -100,7 +107,7 @@
         /// <returns></returns>
         public EtcdResponse Get(string key, bool recursive = false, bool sorted = false, bool consistent = false)
         {
-            return makeKeyRequest(key, Method.GET, req =>
+            return MakeKeyRequest(key, Method.GET, req =>
             {
                 req.AddParameter("recursive", recursive.ToString().ToLower());
                 req.AddParameter("sorted", sorted.ToString().ToLower());
@@ -116,7 +123,7 @@
         /// <returns>note the key will be 'key/index' in the return object</returns>
         public EtcdResponse Queue(string key, object value)
         {
-            return makeKeyRequest(key, Method.POST, req => { req.AddParameter("value", value); });
+            return MakeKeyRequest(key, Method.POST, req => { req.AddParameter("value", value); });
         }
 
 
@@ -129,7 +136,7 @@
         /// <returns></returns>
         public EtcdResponse Delete(string key, string prevValue = null, int? prevIndex = null)
         {
-            return makeKeyRequest(key, Method.DELETE, req =>
+            return MakeKeyRequest(key, Method.DELETE, req =>
             {
                 if (prevValue != null)
                 {
@@ -150,7 +157,7 @@
         /// <returns></returns>
         public EtcdResponse DeleteDir(string key, bool recursive = false)
         {
-            return makeKeyRequest(key, Method.DELETE, req =>
+            return MakeKeyRequest(key, Method.DELETE, req =>
             {
                 req.AddParameter("dir", "true");
                 if (recursive) req.AddParameter("recursive", "true");
@@ -186,31 +193,36 @@
                 getRequest.AddParameter("waitIndex", waitIndex);
             }
 
-            _client.ExecuteAsync<EtcdResponse>(getRequest, r => followUp(processRestResponse(r)));
+            _client.ExecuteAsync<EtcdResponse>(getRequest, r => followUp(ProcessRestResponse(r)));
         }
 
-        EtcdResponse makeKeyRequest(string key, Method method, Action<IRestRequest> action = null)
+        EtcdResponse MakeKeyRequest(string key, Method method, Action<IRestRequest> action = null)
         {
             var requestUrl = _keysRoot.AppendPath(key);
             var request = new RestRequest(requestUrl, method);
 
             if (action != null) action(request);
 
-
             //needed due to issue 469 - https://github.com/coreos/etcd/issues/469
             request.OnBeforeDeserialization = resp => { resp.ContentType = "application/json"; };
 
-            var response = _client.Execute<EtcdResponse>(request);
+            var policy = Policy.Handle<Exception>()
+                .WaitAndRetry(
+                    5,
+                    attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))
+                    );
 
-            if(checkForError(response)) throw constructException(response);
+            var response = policy.Execute(() => _client.Execute<EtcdResponse>(request));
+
+            if(CheckForError(response)) throw ConstructException(response);
             
-            var etcdResponse = processRestResponse(response);
+            var etcdResponse = ProcessRestResponse(response);
             
             return etcdResponse;
         }
 
 
-        static EtcdResponse processRestResponse(IRestResponse<EtcdResponse> response)
+        static EtcdResponse ProcessRestResponse(IRestResponse<EtcdResponse> response)
         {
             if (response == null) return null;
 
@@ -231,12 +243,12 @@
         }
 
 
-        static bool checkForError(IRestResponse<EtcdResponse> response)
+        static bool CheckForError(IRestResponse<EtcdResponse> response)
         {
             return response.StatusCode == 0;
         }
 
-        Exception constructException(IRestResponse<EtcdResponse> response)
+        Exception ConstructException(IRestResponse<EtcdResponse> response)
         {
             var msg = new StringBuilder();
             msg.AppendFormat("Server: '{0}'", _client.BaseUrl);

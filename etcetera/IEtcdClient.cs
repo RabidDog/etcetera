@@ -20,7 +20,6 @@
         EtcdResponse Set(string key, string value, int ttl = 0, bool? prevExist = null, string prevValue = null,
             int? prevIndex = null);
 
-
         /// <summary>
         ///     Creates a dir
         /// </summary>
