@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using Polly;
 using RestSharp.Authenticators;
 
 namespace etcetera
@@ -209,13 +208,7 @@ namespace etcetera
             //needed due to issue 469 - https://github.com/coreos/etcd/issues/469
             request.OnBeforeDeserialization = resp => { resp.ContentType = "application/json"; };
 
-            var policy = Policy.Handle<Exception>()
-                .WaitAndRetry(
-                    5,
-                    attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))
-                    );
-
-            var response = policy.Execute(() => _client.Execute<EtcdResponse>(request));
+			var response = _client.Execute<EtcdResponse>(request);
 
             if(CheckForError(response)) throw ConstructException(response);
             
